@@ -1,5 +1,8 @@
+from datetime import timedelta
 from rest_framework import serializers
-from core.models import *
+from django.utils import timezone
+from django.db.models import Q
+from core.models import User, LeaveRequest
 
 
 
@@ -32,5 +35,65 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['first_name', 'last_name', 'email', 'role', 'monthly_salary',
                   'working_hours', 'manager', 'is_active']
         read_only_fields = ['monthly_salary', 'working_hours', 'manager', 'is_active']
+
+#.............
+# LeaveRequest
+
+class LeaveRequestSerializer(serializers.ModelSerializer):
+    employee = serializers.PrimaryKeyRelatedField(read_only=True)
+    class Meta:
+        model = LeaveRequest
+        fields = "__all__"
+        read_only_fields = ["id","status","end_date","approved_by"]
+
+    def validate(self, data):
+        request = self.context['request']
+        user_id = request.session.get('user_id')
+
+        if not user_id:
+            raise serializers.ValidationError("Authentication required.")
+
+        employee = User.objects.get(id=user_id)
+        start_date = data['start_date']
+        first_day = start_date.replace(day=1)
+        if start_date.month == 12:
+            next_month = start_date.replace(year=start_date.year + 1, month=1, day=1)
+        else:
+            next_month = start_date.replace(month=start_date.month + 1, day=1)
+        monthly_requests_count = LeaveRequest.objects.filter(
+            employee=employee,
+            start_date__gte=first_day,
+            start_date__lt=next_month
+        ).filter(
+            Q(status='APPROVED') | Q(status='PENDING')
+        ).count()
+        if monthly_requests_count >= 2:
+            raise serializers.ValidationError(
+                "You can submit a maximum of 2 optional leave requests per month."
+            )
+        if start_date.weekday() == 6:
+            raise serializers.ValidationError(
+                "Optional leave cannot be requested for Sundays."
+            )
+        today = timezone.localdate()
+        if start_date < today:
+            raise serializers.ValidationError(
+                "Optional leave cannot be requested for past dates."
+            )
+        if LeaveRequest.objects.filter(employee=employee, start_date=start_date).exists():
+            raise serializers.ValidationError("You already have an optional leave request for this date.")
+        return data
+
+    def create(self, validated_data):
+        start_date = validated_data['start_date']
+        validated_data['end_date'] = start_date + timedelta(days=1)
+        return super().create(validated_data)
+
+class LeaveResponseSerializer(serializers.ModelSerializer):
+    approved_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    class Meta:
+        model = LeaveRequest
+        fields = "__all__"
+        read_only_fields = ["id","employee","end_date","start_date","description"]
 
 #.............

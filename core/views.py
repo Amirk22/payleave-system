@@ -87,3 +87,42 @@ class ProfileAPIView(APIView):
         return Response(serializer.data,status=200)
 
 #.............
+# LeaveRequest API View
+
+class LeaveRequestAPIView(generics.ListCreateAPIView):
+    serializer_class = LeaveRequestSerializer
+    permission_classes = [IsEMPLOYEE]
+
+    def get_queryset(self):
+        user_id = self.request.session.get('user_id')
+        if not user_id:
+            return LeaveRequest.objects.none()
+
+        this_month = timezone.now().month
+        return LeaveRequest.objects.filter( employee_id=user_id, start_date__month=this_month)
+
+    def perform_create(self, serializer):
+        user_id = self.request.session.get('user_id')
+        employee = User.objects.get(id=user_id, role='EMPLOYEE')
+        serializer.save(employee=employee)
+
+class LeaveListAPIView(generics.ListAPIView):
+    serializer_class = LeaveRequestSerializer
+    permission_classes = [IsManager]
+    def get_queryset(self):
+        this_month = timezone.now().month
+        return LeaveRequest.objects.filter(status="PENDING", start_date__month=this_month)
+
+class LeaveResponseDetailAPIView(generics.RetrieveUpdateAPIView):
+    serializer_class = LeaveResponseSerializer
+    permission_classes = [IsManager]
+
+    def get_queryset(self):
+        return LeaveRequest.objects.all()
+    def perform_update(self, serializer):
+        user_id = self.request.session.get('user_id')
+        manager = User.objects.get(id=user_id,role='MANAGER')
+        serializer.save(approved_by=manager)
+
+#.............
+
