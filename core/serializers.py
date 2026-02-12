@@ -2,12 +2,14 @@ from datetime import timedelta
 from rest_framework import serializers
 from django.utils import timezone
 from django.db.models import Q
-from core.models import User, LeaveRequest
+from core.models import User, LeaveRequest, OvertimeLog
+from datetime import datetime
 
 
 
 
 
+#.............
 # Authentication
 
 class UserSerializer(serializers.ModelSerializer):
@@ -97,3 +99,45 @@ class LeaveResponseSerializer(serializers.ModelSerializer):
         read_only_fields = ["id","employee","end_date","start_date","description"]
 
 #.............
+# OvertimeLog
+
+class OvertimeLogSerializer(serializers.ModelSerializer):
+    employee = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = OvertimeLog
+        fields = "__all__"
+
+    def validate(self, data):
+        request = self.context['request']
+        user_id = request.session.get('user_id')
+        if not user_id:
+            raise serializers.ValidationError("User not authenticated.")
+
+        try:
+            employee = User.objects.get(id=user_id, role='EMPLOYEE')
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Employee not found.")
+
+        date_obj = data.get('date')
+        if not date_obj:
+            raise serializers.ValidationError("Date is required.")
+
+        today = timezone.localdate()
+
+        if date_obj.month != today.month or date_obj.year != today.year:
+            raise serializers.ValidationError("You can only record overtime for the current month.")
+
+        if LeaveRequest.objects.filter(employee=employee, start_date=date_obj).filter(Q(status="PENDING")| Q(status="APPROVED")).exists():
+            raise serializers.ValidationError("You already had a day off on this date.")
+
+        if OvertimeLog.objects.filter(employee=employee,date=date_obj).exists():
+            raise serializers.ValidationError("You already have an overtime on this date.")
+
+        if date_obj.weekday() == 6:
+            raise serializers.ValidationError("Overtime cannot be recorded on Sundays.")
+
+        return data
+
+
+

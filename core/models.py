@@ -63,3 +63,24 @@ class LeaveRequest(models.Model):
 
     def __str__(self):
         return f'{self.employee} - {self.leave_type}'
+
+
+class OvertimeLog(models.Model):
+    employee = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='overtime_logs'
+    )
+
+    date = models.DateField()
+    overtime_minutes = models.PositiveIntegerField()
+
+    description = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ('employee', 'date')
+
+    def __str__(self):
+        return f'{self.employee} - {self.date}'
+
+

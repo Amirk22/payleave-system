@@ -10,4 +10,5 @@ urlpatterns = [
     path('leave-request/',views.LeaveRequestAPIView.as_view(),name='leave-request'),
     path('leaves/',views.LeaveListAPIView.as_view(),name='leaves'),
     path('leaves/<int:pk>/',views.LeaveResponseDetailAPIView.as_view(),name='leave-response'),
+    path('overtime-log/',views.OvertimeLogListCreateAPIView.as_view(),name='overtime-log'),
 ]

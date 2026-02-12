@@ -125,4 +125,17 @@ class LeaveResponseDetailAPIView(generics.RetrieveUpdateAPIView):
         serializer.save(approved_by=manager)
 
 #.............
+# OvertimeLog API View
 
+class OvertimeLogListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = OvertimeLogSerializer
+    permission_classes = [IsEMPLOYEE]
+
+    def get_queryset(self):
+        user_id = self.request.session.get('user_id')
+        return OvertimeLog.objects.filter(employee_id=user_id)
+
+    def perform_create(self, serializer):
+        user_id = self.request.session.get('user_id')
+        employee = User.objects.get(id=user_id, role='EMPLOYEE')
+        serializer.save(employee=employee)
