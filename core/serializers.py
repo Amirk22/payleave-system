@@ -2,11 +2,7 @@ from datetime import timedelta
 from rest_framework import serializers
 from django.utils import timezone
 from django.db.models import Q
-from core.models import User, LeaveRequest, OvertimeLog, PayrollRun
-from datetime import datetime
-
-
-
+from core.models import User, LeaveRequest, OvertimeLog, PayrollRun, PayrollRecord
 
 
 #.............
@@ -160,4 +156,28 @@ class PayrollRunUpdateSerializer(serializers.ModelSerializer):
         model = PayrollRun
         fields = "__all__"
         read_only_fields = ['year','month','executed_by','run_date']
+
+#.............
+# PayrollRecord
+
+class PayrollRecordSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PayrollRecord
+        fields = "__all__"
+        read_only_fields = [
+            'unpaid_leave_days',
+            'unpaid_leave_deduction',
+            'overtime_hours',
+            'overtime_amount',
+            'final_salary',
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['payroll_run'].queryset = PayrollRun.objects.filter(is_finalized=True)
+        user_id = self.context['request'].session.get('user_id')
+        if not user_id:
+            raise serializers.ValidationError("User not authenticated.")
+        self.fields['employee'].queryset = User.objects.filter(role='EMPLOYEE')
 

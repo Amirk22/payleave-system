@@ -8,7 +8,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework import permissions
 from django.db import IntegrityError
 from rest_framework.exceptions import ValidationError
-
+import calendar
 
 
 
@@ -167,3 +167,56 @@ class PayrollRunUpdateAPIView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsManager]
     def get_queryset(self):
         return PayrollRun.objects.all()
+
+#.............
+# PayrollRecord API View
+
+class PayrollRecordAPIView(generics.ListCreateAPIView):
+    permission_classes = [IsManager]
+    serializer_class = PayrollRecordSerializer
+
+    def get_queryset(self):
+        return PayrollRecord.objects.all()
+
+    def perform_create(self, serializer):
+        employee = serializer.validated_data['employee']
+        base_salary = serializer.validated_data['base_salary']
+        payroll_run = serializer.validated_data['payroll_run']
+        user_id = self.request.session.get('user_id')
+        manager = User.objects.get(id=user_id, role='MANAGER')
+
+        year = payroll_run.year
+        month = payroll_run.month
+        days_in_month = calendar.monthrange(year, month)[1]
+
+        overtime = OvertimeLog.objects.filter(
+            employee=employee,
+            date__year=year,
+            date__month=month
+        )
+        overtime_hours = sum(log.overtime_minutes for log in overtime)
+
+        unpaid_leave_days = LeaveRequest.objects.filter(
+            employee=employee,
+            status="APPROVED",
+            start_date__year=year,
+            start_date__month=month
+        ).count()
+
+        income_day = base_salary / days_in_month
+        hourly_rate = (income_day / 8) / 60
+
+        overtime_hours = round(overtime_hours / 60)
+        overtime_amount = overtime_hours * hourly_rate
+        unpaid_leave_deduction = income_day * unpaid_leave_days
+        final_salary = (base_salary + overtime_amount) - unpaid_leave_deduction
+
+        User.objects.filter(id=employee.id).update(monthly_salary=final_salary,manager=manager)
+
+        serializer.save(
+            unpaid_leave_days=unpaid_leave_days,
+            unpaid_leave_deduction=unpaid_leave_deduction,
+            overtime_hours=overtime_hours,
+            overtime_amount=overtime_amount,
+            final_salary=final_salary
+        )

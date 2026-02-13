@@ -13,4 +13,5 @@ urlpatterns = [
     path('overtime-log/',views.OvertimeLogListCreateAPIView.as_view(),name='overtime-log'),
     path('payroll-run/',views.PayrollRunListCreateAPIView.as_view(),name='payroll-run'),
     path('payroll-run/<int:pk>/',views.PayrollRunUpdateAPIView.as_view(),name='update_payroll-run'),
+    path('payroll-record/',views.PayrollRecordAPIView.as_view(),name='payroll-record'),
 ]
