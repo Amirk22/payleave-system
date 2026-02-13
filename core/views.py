@@ -6,7 +6,8 @@ from .models import *
 from rest_framework import generics ,status
 from rest_framework.permissions import BasePermission
 from rest_framework import permissions
-
+from django.db import IntegrityError
+from rest_framework.exceptions import ValidationError
 
 
 
@@ -139,3 +140,30 @@ class OvertimeLogListCreateAPIView(generics.ListCreateAPIView):
         user_id = self.request.session.get('user_id')
         employee = User.objects.get(id=user_id, role='EMPLOYEE')
         serializer.save(employee=employee)
+
+#.............
+# PayrollRun API View
+
+class PayrollRunListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = PayrollRunSerializer
+    permission_classes = [IsManager]
+    def get_queryset(self):
+        year = timezone.now().year
+        return PayrollRun.objects.filter(year=year)
+
+
+
+    def perform_create(self, serializer):
+        user_id = self.request.session.get('user_id')
+        executed_by = User.objects.get(id=user_id, role='MANAGER')
+        year = timezone.now().year
+        try:
+            serializer.save(executed_by=executed_by, year=year)
+        except IntegrityError:
+            raise ValidationError("Payroll for this month already exists.")
+
+class PayrollRunUpdateAPIView(generics.RetrieveUpdateAPIView):
+    serializer_class = PayrollRunUpdateSerializer
+    permission_classes = [IsManager]
+    def get_queryset(self):
+        return PayrollRun.objects.all()

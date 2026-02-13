@@ -1,5 +1,6 @@
 from django.db import models
-
+from django.core.validators import MinValueValidator, MaxValueValidator
+from datetime import date
 
 
 class User(models.Model):
@@ -83,4 +84,21 @@ class OvertimeLog(models.Model):
     def __str__(self):
         return f'{self.employee} - {self.date}'
 
+class PayrollRun(models.Model):
+    year = models.PositiveIntegerField()
+    month = models.PositiveIntegerField(validators=[MinValueValidator(1),MaxValueValidator(12),])
 
+    executed_by = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='payroll_runs'
+    )
+
+    run_date = models.DateTimeField(auto_now_add=True)
+    is_finalized = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('year', 'month')
+
+    def __str__(self):
+        return f'Payroll {self.year}-{self.month}'

@@ -11,4 +11,6 @@ urlpatterns = [
     path('leaves/',views.LeaveListAPIView.as_view(),name='leaves'),
     path('leaves/<int:pk>/',views.LeaveResponseDetailAPIView.as_view(),name='leave-response'),
     path('overtime-log/',views.OvertimeLogListCreateAPIView.as_view(),name='overtime-log'),
+    path('payroll-run/',views.PayrollRunListCreateAPIView.as_view(),name='payroll-run'),
+    path('payroll-run/<int:pk>/',views.PayrollRunUpdateAPIView.as_view(),name='update_payroll-run'),
 ]

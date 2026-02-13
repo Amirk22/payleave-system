@@ -2,7 +2,7 @@ from datetime import timedelta
 from rest_framework import serializers
 from django.utils import timezone
 from django.db.models import Q
-from core.models import User, LeaveRequest, OvertimeLog
+from core.models import User, LeaveRequest, OvertimeLog, PayrollRun
 from datetime import datetime
 
 
@@ -123,11 +123,6 @@ class OvertimeLogSerializer(serializers.ModelSerializer):
         if not date_obj:
             raise serializers.ValidationError("Date is required.")
 
-        today = timezone.localdate()
-
-        if date_obj.month != today.month or date_obj.year != today.year:
-            raise serializers.ValidationError("You can only record overtime for the current month.")
-
         if LeaveRequest.objects.filter(employee=employee, start_date=date_obj).filter(Q(status="PENDING")| Q(status="APPROVED")).exists():
             raise serializers.ValidationError("You already had a day off on this date.")
 
@@ -137,7 +132,32 @@ class OvertimeLogSerializer(serializers.ModelSerializer):
         if date_obj.weekday() == 6:
             raise serializers.ValidationError("Overtime cannot be recorded on Sundays.")
 
+        payroll = PayrollRun.objects.filter(
+            year=date_obj.year,
+            month=date_obj.month
+        ).first()
+
+        if not payroll:
+            raise serializers.ValidationError("Payroll period is not opened yet.")
+
+        if payroll.is_finalized:
+            raise serializers.ValidationError("The overtime registration period for this month has expired.")
+
         return data
 
+#.............
+# PayrollRun
 
+class PayrollRunSerializer(serializers.ModelSerializer):
+    year = serializers.IntegerField(read_only=True)
+    executed_by = serializers.PrimaryKeyRelatedField(read_only=True)
+    class Meta:
+        model = PayrollRun
+        fields = "__all__"
+
+class PayrollRunUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollRun
+        fields = "__all__"
+        read_only_fields = ['year','month','executed_by','run_date']
 
